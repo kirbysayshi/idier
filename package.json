@@ -1,0 +1,30 @@
+{
+  "name": "@kirbysayshi/wedge",
+  "description": "Rotate the wedges!",
+  "author": "Drew Petersen <kirbysayshi@gmail.com>",
+  "repository": "@@CHANGE THIS@@",
+  "version": "0.0.0",
+  "private": true,
+  "main": "cjs/index.js",
+  "module": "esm/index.js",
+  "types": "types",
+  "scripts": {
+    "lint": "web-scripts lint",
+    "test": "web-scripts test",
+    "build": "web-scripts build",
+    "commit": "web-scripts commit",
+    "release": "web-scripts release",
+    "postinstall": "web-scripts postinstall --threshold low"
+  },
+  "husky": {
+    "hooks": {
+      "commit-msg": "web-scripts commitmsg",
+      "pre-commit": "web-scripts precommit"
+    }
+  },
+  "devDependencies": {
+    "@kirbysayshi/ts-run": "^3.0.1",
+    "@spotify/web-scripts": "^3.3.0",
+    "husky": "^3.1.0"
+  }
+}
