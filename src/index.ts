@@ -45,25 +45,26 @@ function parseArgv(argv: string[]) {
   if (dryRunIdx > -1) config.dryRun = true;
 
   const helpIdx = argv.indexOf('--help');
-  if (helpIdx > -1) config.help = true;
-
-  return config;
-}
-
-function help(config: ReturnType<typeof parseArgv>) {
-  console.log(`
+  const help = `
 Wedge: Move projects untouched for more than ${config.age} days to ${config.archive}!
 
 Options: 
-  --age                 Archive projects with files modified longer than this many days
+  --age [days]          Archive projects with files modified longer than this many days
                           (current: ${config.age})
-  --root                Use this directory as the root for project folders
+  --root [path]         Use this directory as the root for project folders
                           (current: ${config.root})
-  --archive             Use this directory as the Archive folder
+  --archive [path]      Use this directory as the Archive folder
                           (current: ${config.archive})
   --dry-run             Don't move any files, just report what _would_ be moved
                           (current: ${config.dryRun})
-`);
+`;
+
+  if (helpIdx > -1) {
+    console.log(help);
+    process.exit(1);
+  }
+
+  return config;
 }
 
 function collectFiles(
@@ -121,6 +122,7 @@ function topLevelDirectoryAge(
       });
       currentTopLevel = topLevels[topLevels.length - 1];
     }
+    // TODO: could probably remove these
     currentTopLevel.mostRecentMtimeMs = Math.max(
       currentTopLevel.mostRecentMtimeMs,
       desc.stats.mtimeMs,
@@ -150,11 +152,6 @@ function topLevelsStalerThan(topLevels: FolderDesc[], ageDays: number) {
 
 async function run() {
   const config = parseArgv(process.argv);
-
-  if (config.help) {
-    help(config);
-    process.exit(1)
-  }
 
   const files = collectFiles(config.root, config.root, config.exclude);
   const projects = topLevelDirectoryAge(config.root, config.archive, files);
