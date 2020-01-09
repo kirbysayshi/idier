@@ -9,6 +9,14 @@
   "main": "cjs/index.js",
   "module": "esm/index.js",
   "types": "types",
+  "bin": "cjs/index.js",
+  "files": [
+    "cjs",
+    "esm",
+    "types",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
     "lint": "web-scripts lint",
     "test": "web-scripts test",
