@@ -1,26 +1,27 @@
 /* eslint-disable no-console */
 import fs from 'fs';
 import path from 'path';
+import readline from 'readline';
 
 type FileDesc = { absolute: string; relative: string; stats: fs.Stats };
 
 type FolderDesc = {
   relative: string;
   absolute: string;
-  absoluteArchiveDest: string;
-  mostRecentMtimeMs: number;
-  mostRecentMtimeDays: number;
-  relativeToNowMtimeDays: number;
+  absArchiveDest: string;
+  daysSinceModified: number;
 };
 
 function parseArgv(argv: string[]) {
   const config = {
     age: 180, // days
+    // TODO: allow configuring this via a config file? the goal is that you shouldn't need cli args
     exclude: /node_modules|\.git\/|.DS_Store|_Archive\//,
     root: process.cwd(),
     archive: path.join(process.cwd(), '_Archive'),
-    dryRun: false,
+    yes: false,
     help: false,
+    projects: false,
   };
 
   const ageIdx = argv.indexOf('--days');
@@ -41,22 +42,29 @@ function parseArgv(argv: string[]) {
       : path.join(process.cwd(), argv[archiveIdx + 1]);
   }
 
-  const dryRunIdx = argv.indexOf('--dry-run');
-  if (dryRunIdx > -1) config.dryRun = true;
+  const yesIdx = argv.indexOf('--yes');
+  if (yesIdx > -1) config.yes = true;
+  const yIdx = argv.indexOf('-y');
+  if (yIdx > -1) config.yes = true;
+
+  const projectsIdx = argv.indexOf('--projects');
+  if (projectsIdx > -1) config.projects = true;
 
   const helpIdx = argv.indexOf('--help');
   const help = `
-Wedge: Move projects untouched for more than ${config.age} days to ${config.archive}!
+idier: Move projects untouched for more than ${config.age} days to ${config.archive}!
 
 Options: 
-  --age [days]          Archive projects with files modified longer than this many days
+  --age [days]          Archive projects if files have been untouched for this many days
                           (current: ${config.age})
   --root [path]         Use this directory as the root for project folders
                           (current: ${config.root})
   --archive [path]      Use this directory as the Archive folder
                           (current: ${config.archive})
-  --dry-run             Don't move any files, just report what _would_ be moved
-                          (current: ${config.dryRun})
+  --yes / -y            Do not prompt the user to confirm the archive.
+                          (current: ${config.yes})
+  --projects            Print the list of projects and their ages, then exit.
+                          (current: ${config.projects})
 `;
 
   if (helpIdx > -1) {
@@ -96,85 +104,162 @@ function collectFiles(
   return fileList;
 }
 
-function topLevelDirectoryAge(
-  root: string,
-  archive: string,
-  fileList: FileDesc[],
-) {
+function projectDirs(root: string, archive: string, fileList: FileDesc[]) {
   const now = Date.now();
-  const topLevels: FolderDesc[] = [];
-  let currentTopLevel: FolderDesc | undefined = topLevels[0];
+  const projects = new Map<string, FolderDesc>();
+
   for (let i = 0; i < fileList.length; i++) {
     const desc = fileList[i];
-    const pathParts = desc.relative.split(path.sep).filter(Boolean);
-    const topLevel = pathParts[0];
-    // if it's only one segment, it's likely not a folder and is just a file.
-    if (!topLevel || pathParts.length <= 1) continue;
-    if (!currentTopLevel || currentTopLevel.relative !== topLevel) {
-      // new project folder! close the old and reset
-      topLevels.push({
-        relative: topLevel,
-        absolute: path.join(root, topLevel),
-        absoluteArchiveDest: path.join(archive, topLevel),
-        mostRecentMtimeMs: 0,
-        mostRecentMtimeDays: 0,
-        relativeToNowMtimeDays: Number.MAX_SAFE_INTEGER,
-      });
-      currentTopLevel = topLevels[topLevels.length - 1];
-    }
-    // TODO: could probably remove these
-    currentTopLevel.mostRecentMtimeMs = Math.max(
-      currentTopLevel.mostRecentMtimeMs,
-      desc.stats.mtimeMs,
+    const folder = extractFirstFolder(desc.relative);
+    if (!folder) continue;
+
+    const current: FolderDesc = projects.has(folder)
+      ? projects.get(folder)!
+      : {
+          relative: folder,
+          absolute: path.join(root, folder),
+          absArchiveDest: path.join(archive, folder),
+          daysSinceModified: Number.MAX_SAFE_INTEGER,
+        };
+
+    current.daysSinceModified = Math.min(
+      current.daysSinceModified,
+      msToDays(now - desc.stats.mtimeMs),
     );
-    currentTopLevel.mostRecentMtimeDays = Math.max(
-      currentTopLevel.mostRecentMtimeDays,
-      Math.round(desc.stats.mtimeMs / 1000 / 3600 / 24),
-    );
-    currentTopLevel.relativeToNowMtimeDays = Math.min(
-      currentTopLevel.relativeToNowMtimeDays,
-      Math.round((now - desc.stats.mtimeMs) / 1000 / 3600 / 24),
-    );
+
+    projects.set(folder, current);
   }
-  return topLevels.filter(
-    f =>
-      Boolean(f.relative) &&
-      Boolean(f.mostRecentMtimeMs) &&
-      Boolean(f.mostRecentMtimeDays),
-  );
+  return Array.from(projects.values());
 }
 
-function topLevelsStalerThan(topLevels: FolderDesc[], ageDays: number) {
-  return topLevels.filter(t => {
-    return t.relativeToNowMtimeDays > ageDays;
+function extractFirstFolder(relativePath: string) {
+  if (relativePath[0] === path.sep)
+    throw new Error(
+      `relativePath must be relative, not absolute! ${relativePath}`,
+    );
+
+  // There is apparently not really a better way to extract the first path segment.
+  const pathParts = relativePath.split(path.sep).filter(Boolean);
+
+  if (pathParts.length <= 1) {
+    // if it's only one segment, it's likely not a folder and is just a file.
+    return null;
+  }
+
+  // Exclude empty strings and avoid ./path/to/folder
+  const folder = pathParts.find(p => p !== '' && p !== '.');
+  if (!folder) return null;
+  return folder;
+}
+
+function msToDays(ms: number) {
+  return Math.round(ms / 1000 / 3600 / 24);
+}
+
+function projectsStalerThan(projects: FolderDesc[], ageDays: number) {
+  return projects.filter(t => {
+    return t.daysSinceModified > ageDays;
   });
+}
+
+const logSummary = (
+  files: FileDesc[],
+  projects: FolderDesc[],
+  durationMs: number,
+) => {
+  const displayMs = `${durationMs % 1000}`.padStart(3, '0');
+  const totalSeconds = Math.round(durationMs / 1000);
+  const minutes = Math.round(totalSeconds / 60)
+    .toString()
+    .padStart(2, '0');
+  const displaySeconds = `${totalSeconds % 60}`.padStart(2, '0');
+  const timing = `${minutes}m${displaySeconds}s${displayMs}ms`;
+  console.log(
+    `Analyzed ${files.length} files in ${projects.length} projects in ${timing}`,
+  );
+  console.log();
+};
+
+const logProjects = (projects: FolderDesc[]) => {
+  console.log(`Projects:`);
+  projects.forEach(p => {
+    console.log(`  ${p.relative} (${p.daysSinceModified} days ago)`);
+  });
+}
+
+const logStaleProjects = (stales: FolderDesc[], age: number) => {
+  console.log(`Projects untouched for more than ${age} days:`);
+  stales.forEach(stale => {
+    console.log(
+      `  ${stale.relative} (${stale.daysSinceModified} days ago) -> WILL ARCHIVE`,
+    );
+  });
+  console.log();
+};
+
+const logNothingToDo = (age: number) =>
+  console.log(
+    `No projects untouched for more than ${age} days. Nothing to do!`,
+  );
+
+const logMove = (stale: FolderDesc) =>
+  console.log(`moving ${stale.absolute} -> ${stale.absArchiveDest}`);
+
+async function awaitConfirmation() {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  rl.setPrompt('Archive above projects? y/N: ');
+  rl.prompt();
+
+  for await (const line of rl) {
+    if (line.match(/y/i)) {
+      return true;
+    }
+
+    if (line.match(/n/i) || line.match('')) {
+      return false;
+    }
+
+    rl.prompt();
+  }
+
+  return false;
 }
 
 async function run() {
+  const start = Date.now();
   const config = parseArgv(process.argv);
 
   const files = collectFiles(config.root, config.root, config.exclude);
-  const projects = topLevelDirectoryAge(config.root, config.archive, files);
-  const stales = topLevelsStalerThan(projects, config.age);
+  const projects = projectDirs(config.root, config.archive, files);
+  const stales = projectsStalerThan(projects, config.age);
 
-  console.log(`analyzed ${files.length} files in ${projects.length} projects.`);
-  console.log(`projects:`);
-  projects.forEach(p => {
-    console.log(`  ${p.relative} (${p.relativeToNowMtimeDays} days ago)`);
-  });
+  const end = Date.now() - start;
+  
+  if (config.projects) {
+    logProjects(projects);
+    logSummary(files, projects, end);
+    return;
+  }
+  
 
+  if (stales.length === 0) {
+    logSummary(files, projects, end);
+    logNothingToDo(config.age);
+    return;
+  }
+
+  logSummary(files, projects, end);
+  logStaleProjects(stales, config.age);
+
+  const move = config.yes ? true : await awaitConfirmation();
   stales.forEach(s => {
-    console.log(
-      `project ${s.relative} (${s.relativeToNowMtimeDays}) is older than ${config.age} days!`,
-    );
-    if (config.dryRun) {
-      console.log(
-        `--dry-run, skipping ${s.absolute} -> ${s.absoluteArchiveDest}`,
-      );
-    } else {
-      console.log(`moving ${s.absolute} -> ${s.absoluteArchiveDest}`);
-      fs.renameSync(s.absolute, s.absoluteArchiveDest);
-    }
+    if (!move) return;
+    logMove(s);
+    fs.renameSync(s.absolute, s.absArchiveDest);
   });
 }
 
