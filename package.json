@@ -12,7 +12,7 @@
   "main": "cjs/index.js",
   "module": "esm/index.js",
   "types": "types",
-  "bin": "cjs/index.js",
+  "bin": "./cli",
   "files": [
     "cjs",
     "esm",
