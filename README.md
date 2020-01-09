@@ -2,9 +2,15 @@
 
 [Background on why this tool exists](https://kirbysayshi.com/2020/01/05/keeping-my-digital-desk-clean-through-rules-and-tools.html).
 
-Idier is a tool that moves folders into a specially named folder called `_Archive` if the files in those folders have not been modified recently. This tool is meant to automatically tidy up your "projects folder": that bucket of folders probably everyone has. Perhaps you produce music and have a folder with all of your song projects in them. Or a coder with lots of git repos. Using this tool will reduce the clutter and decision making process.
+Idier is a tool that moves top-level folders into a specially named folder called `_Archive` if the files in those folders have not been modified recently.
 
-## Usage
+This tool is meant to automatically tidy up your "projects folder": that bucket of folders probably everyone has. Perhaps you produce music and have a folder with all of your song projects. Or a coder with lots of git repos. Or folders for each of your graphic design clients. Using this tool will reduce the clutter and decision making process.
+
+# How Does It Work?
+
+Given a root folder (defaults to current working directory), look at all the files and their relative mtimes (days since last modified). Group them all into top-level folders, taking the newest mtime of all the children per folder. If the newest relative mtime is more than the configured number of days (defaults to 180 days), then move the folder into the configured archive folder (defaults to `_Archive`). It ignores bare files without a folder, as well as some typical non-user files, like `.git` or `node_modules`.
+
+# Usage
 
 An example is probably better than words:
 
@@ -37,7 +43,7 @@ Archive above projects? y/N: y
 moving /Users/drew/Projects/project01 -> /Users/drew/Projects/_Archive/project01
 ```
 
-By default, and "untouched" project is one unmodified for more than 180 days. This is configurable, along with other options:
+By default, an "untouched" project is one unmodified for more than 180 days. This is configurable, along with other options:
 
 ```sh
 $ npx @kirbysayshi/idier
@@ -57,13 +63,12 @@ Options:
                           (current: false)
 ```
 
-## Contributing / Development
+# Contributing / Development
 
 This project uses [@spotify/web-scripts](https://github.com/spotify/web-scripts) for build, test, lint, auto-format, and release.
 
 Use `yarn commit` so that semantic-release knows when to release during master builds!
 
-- [ ] replace every `@@CHANGE THIS@@` in package.json
-- [ ] remove `private: true` if you plan to publish the library to NPM
-- [ ] use `yarn commit` when committing to this repo (uses commitizen)
-- [ ] set a `license` in your package.json and create a `LICENSE` file
+# LICENSE
+
+MIT
