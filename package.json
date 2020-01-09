@@ -6,6 +6,9 @@
   "version": "0.0.0",
   "license": "MIT",
   "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "cjs/index.js",
   "module": "esm/index.js",
   "types": "types",
