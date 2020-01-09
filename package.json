@@ -26,7 +26,7 @@
     "build": "web-scripts build",
     "commit": "web-scripts commit",
     "release": "web-scripts release",
-    "postinstall": "web-scripts postinstall --threshold low"
+    "prepare": "web-scripts postinstall --threshold low"
   },
   "husky": {
     "hooks": {
