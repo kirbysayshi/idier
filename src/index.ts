@@ -17,6 +17,7 @@ function parseArgv(argv: string[]) {
   const config = {
     age: 180, // days
     // TODO: allow configuring this via a config file? the goal is that you shouldn't need cli args
+    // FIXME: if --archive is set, this regexp will fail!
     exclude: /node_modules|\.git\/|.DS_Store|_Archive\//,
     root: process.cwd(),
     archive: path.join(process.cwd(), '_Archive'),
@@ -38,6 +39,7 @@ function parseArgv(argv: string[]) {
 
   const archiveIdx = argv.indexOf('--archive');
   if (archiveIdx > -1) {
+    // FIXME: this also needs to set excludes properly!
     config.archive = path.isAbsolute(argv[archiveIdx + 1])
       ? argv[archiveIdx + 1]
       : path.join(process.cwd(), argv[archiveIdx + 1]);
@@ -153,6 +155,11 @@ function extractFirstFolder(relativePath: string) {
   return folder;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function assertNever(_n: never) {
+  throw new Error('ShouldNeverHappen');
+}
+
 function msToDays(ms: number) {
   return Math.round(ms / 1000 / 3600 / 24);
 }
@@ -161,6 +168,25 @@ function projectsStalerThan(projects: FolderDesc[], ageDays: number) {
   return projects.filter(t => {
     return t.daysSinceModified > ageDays;
   });
+}
+
+function sortProjects(
+  projects: FolderDesc[],
+  order: 'ALPHA_DESC' | 'SINCE_MODIFIED_ASC',
+): FolderDesc[] {
+  switch (order) {
+    case 'ALPHA_DESC':
+      return projects
+        .slice()
+        .sort((a, b) => a.relative.localeCompare(b.relative));
+    case 'SINCE_MODIFIED_ASC':
+      return projects
+        .slice()
+        .sort((a, b) => b.daysSinceModified - a.daysSinceModified);
+    default: {
+      throw assertNever(order);
+    }
+  }
 }
 
 const logSummary = (
@@ -181,12 +207,12 @@ const logSummary = (
   console.log();
 };
 
-const logProjects = (projects: FolderDesc[]) => {
-  console.log(`Projects:`);
+const logProjects = (projects: FolderDesc[], heading = `Projects`) => {
+  console.log(`${heading}:`);
   projects.forEach(p => {
     console.log(`  ${p.relative} (${p.daysSinceModified} days ago)`);
   });
-}
+};
 
 const logStaleProjects = (stales: FolderDesc[], age: number) => {
   console.log(`Projects untouched for more than ${age} days:`);
@@ -230,22 +256,43 @@ async function awaitConfirmation() {
   return false;
 }
 
+function collectArchive(archive: string, exclude: RegExp) {
+  // TODO: this is super hacky. Perhaps the archive should never be a folder but always be strict value? Or unconfigurable?
+  const excludesMinusArchive = new RegExp(
+    exclude.toString().replace(`|_Archive\/`, ''),
+  );
+  const archivedFiles = collectFiles(archive, archive, excludesMinusArchive);
+  const archivedProjects = sortProjects(
+    projectDirs(archive, path.join(archive, 'FAKE_ARCHIVE'), archivedFiles),
+    'SINCE_MODIFIED_ASC',
+  );
+  return { archivedProjects, archivedFiles };
+}
+
 async function run() {
-  const start = Date.now();
   const config = parseArgv(process.argv);
 
+  const start = Date.now();
   const files = collectFiles(config.root, config.root, config.exclude);
   const projects = projectDirs(config.root, config.archive, files);
   const stales = projectsStalerThan(projects, config.age);
-
   const end = Date.now() - start;
-  
+
   if (config.projects) {
+    const archiveStart = Date.now();
+    const { archivedProjects, archivedFiles } = collectArchive(
+      config.archive,
+      config.exclude,
+    );
+    const archiveEnd = Date.now() - archiveStart;
+
+    logProjects(archivedProjects, 'Archives Oldest -> Newest');
+    logSummary(archivedFiles, archivedProjects, archiveEnd);
+
     logProjects(projects);
     logSummary(files, projects, end);
     return;
   }
-  
 
   if (stales.length === 0) {
     logSummary(files, projects, end);
