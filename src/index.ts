@@ -261,6 +261,14 @@ function collectArchive(archive: string, exclude: RegExp) {
   const excludesMinusArchive = new RegExp(
     exclude.toString().replace(`|_Archive\/`, ''),
   );
+
+  // If archive does not exist, there is nothing to collect!
+  try {
+    fs.statSync(archive);
+  } catch (e) {
+    return { archivedProjects: [], archivedFiles: [] };
+  }
+
   const archivedFiles = collectFiles(archive, archive, excludesMinusArchive);
   const archivedProjects = sortProjects(
     projectDirs(archive, path.join(archive, 'FAKE_ARCHIVE'), archivedFiles),
