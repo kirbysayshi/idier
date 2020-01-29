@@ -291,8 +291,8 @@ function ensureArchiveExists(archive: string) {
   }
 }
 
-async function run() {
-  const config = parseArgv(process.argv);
+export async function run(argv: NodeJS.Process['argv']) {
+  const config = parseArgv(argv);
 
   const start = Date.now();
   const files = collectFiles(config.root, config.root, config.exclude);
@@ -335,5 +335,3 @@ async function run() {
     return;
   }
 }
-
-run();

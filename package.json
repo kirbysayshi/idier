@@ -39,5 +39,9 @@
     "@kirbysayshi/ts-run": "^3.0.1",
     "@spotify/web-scripts": "^3.3.0",
     "husky": "^3.1.0"
+  },
+  "dependencies": {
+    "@types/mock-fs": "^4.10.0",
+    "mock-fs": "^4.10.4"
   }
 }
