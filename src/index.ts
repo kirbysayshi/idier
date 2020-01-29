@@ -262,10 +262,8 @@ function collectArchive(archive: string, exclude: RegExp) {
     exclude.toString().replace(`|_Archive\/`, ''),
   );
 
-  // If archive does not exist, there is nothing to collect!
-  try {
-    fs.statSync(archive);
-  } catch (e) {
+  // Nothing to list if archive doesn't exist!
+  if (!archiveExists(archive)) {
     return { archivedProjects: [], archivedFiles: [] };
   }
 
@@ -275,6 +273,22 @@ function collectArchive(archive: string, exclude: RegExp) {
     'SINCE_MODIFIED_ASC',
   );
   return { archivedProjects, archivedFiles };
+}
+
+function archiveExists(archive: string) {
+  // If stat throws, archive doesn't exist!
+  try {
+    fs.statSync(archive);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function ensureArchiveExists(archive: string) {
+  if (!archiveExists(archive)) {
+    fs.mkdirSync(archive, { recursive: true });
+  }
 }
 
 async function run() {
@@ -312,11 +326,14 @@ async function run() {
   logStaleProjects(stales, config.age);
 
   const move = config.yes ? true : await awaitConfirmation();
-  stales.forEach(s => {
-    if (!move) return;
-    logMove(s);
-    fs.renameSync(s.absolute, s.absArchiveDest);
-  });
+  if (move) {
+    ensureArchiveExists(config.archive);
+    stales.forEach(s => {
+      logMove(s);
+      fs.renameSync(s.absolute, s.absArchiveDest);
+    });
+    return;
+  }
 }
 
 run();

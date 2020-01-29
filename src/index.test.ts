@@ -15,3 +15,5 @@ test('display help', async () => {
     expect(e.stdout).toMatch(/--yes/);
   }
 });
+
+// TODO: expand these with mock-fs: https://www.npmjs.com/package/mock-fs
