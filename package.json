@@ -37,11 +37,15 @@
   },
   "devDependencies": {
     "@kirbysayshi/ts-run": "^3.0.1",
-    "@spotify/web-scripts": "^3.3.0",
-    "husky": "^3.1.0"
+    "@spotify/web-scripts": "^6.2.0",
+    "husky": "^4.2.3"
   },
   "dependencies": {
     "@types/mock-fs": "^4.10.0",
-    "mock-fs": "^4.10.4"
+    "mock-fs": "^4.11.0"
+  },
+  "resolutions": {
+    "mem": "^4.3.0",
+    "minimist": "^1.2.5"
   }
 }

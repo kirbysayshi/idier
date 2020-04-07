@@ -14,6 +14,8 @@ type FolderDesc = {
 };
 
 function parseArgv(argv: string[]) {
+  // TODO: add a feature to list what file was used to sort a project into the archive or not.
+
   const config = {
     age: 180, // days
     // TODO: allow configuring this via a config file? the goal is that you shouldn't need cli args
