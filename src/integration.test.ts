@@ -14,14 +14,17 @@ try {
 }
 
 test('display help via bin', async () => {
+  let caught;
   try {
     await execp('./cli --help');
   } catch (e) {
-    expect(e.code).toBe(1);
-    expect(e.stdout).toMatch(/--age/);
-    expect(e.stdout).toMatch(/--root/);
-    expect(e.stdout).toMatch(/--archive/);
-    expect(e.stdout).toMatch(/--projects/);
-    expect(e.stdout).toMatch(/--yes/);
+    caught = e;
   }
+
+  expect(caught.code).toBe(1);
+  expect(caught.stdout).toMatch(/--age/);
+  expect(caught.stdout).toMatch(/--root/);
+  expect(caught.stdout).toMatch(/--archive/);
+  expect(caught.stdout).toMatch(/--projects/);
+  expect(caught.stdout).toMatch(/--yes/);
 });
